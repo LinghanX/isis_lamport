@@ -19,13 +19,12 @@ int main (int argc, char **argv) {
     auto console = spdlog::stdout_color_mt("console");
     console->info("welcome, starting program!") ;
 
-    std::vector<std::string> host_names;
-    std::unordered_map<int, std::string> id_to_host_name;
+    std::unordered_map<std::string, int> hostname_to_id;
     int port;
     int count;
 
-    std::tie(host_names, port, count) = handle_input(argc, argv);
-    ISIS *program = new ISIS(id_to_host_name, port, count);
+    std::tie(hostname_to_id, port, count) = handle_input(argc, argv);
+    ISIS *program = new ISIS(hostname_to_id, port, count);
     program -> broadcast();
 
     exit(0);

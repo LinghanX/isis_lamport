@@ -10,7 +10,7 @@
 
 class ISIS {
 public:
-    ISIS(const std::unordered_map<int, std::string>&, int, int);
+    ISIS(const std::unordered_map<std::string, int>&, int, int);
     void broadcast();
 };
 

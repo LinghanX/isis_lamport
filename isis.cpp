@@ -4,16 +4,13 @@
 #include <stdlib.h>
 #include <string>
 #include <unordered_map>
+#include "isis.h"
 
 using namespace std;
 
-class ISIS {
-public:
-    ISIS(const unordered_map<int, string> &id_to_hostname, int port, int msg_num) {
+    ISIS::ISIS(const unordered_map<string, int> &hostname_to_id, int port, int msg_num) {
     }
 
-    void broadcast() {
-
+    void ISIS::broadcast() {
     };
-};
 

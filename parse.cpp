@@ -12,19 +12,25 @@
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <fstream>
 #include <iostream>
+#include <unordered_map>
 
-std::vector<std::string> parsePath(std::string paths) {
-    std::vector<std::string> hostAdds;
+std::unordered_map<std::string, int> parsePath(std::string paths) {
+    std::unordered_map<std::string, int> map;
     std::ifstream file(paths);
     std::string str;
+    int counter = 1;
     while (std::getline(file, str))
     {
-        hostAdds.push_back(str);
+        map[str] = counter++;
     }
-    return hostAdds;
+    for( const auto& n : map ) {
+        std::cout << "Key:[" << n.first << "] Value:[" << n.second << "]\n";
+    }
+
+    return map;
 }
 
-std::tuple<std::vector<std::string>, int, int> handle_input(int argc, char **argv)
+std::tuple<std::unordered_map<std::string, int>, int, int> handle_input(int argc, char **argv)
 {
     auto logger = spdlog::get("console");
 
@@ -35,7 +41,7 @@ std::tuple<std::vector<std::string>, int, int> handle_input(int argc, char **arg
     int portNum = 0;
     char *path;
     int count = 0;
-    std::vector<std::string> neighbors;
+    std::unordered_map<std::string, int> neighbors;
 
     while ((option = getopt(argc, argv, "p:h:c:")) != -1) {
         switch (option) {
