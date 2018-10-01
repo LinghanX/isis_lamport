@@ -27,6 +27,8 @@ std::unordered_map<std::string, int> parsePath(std::string paths) {
         std::cout << "Key:[" << n.first << "] Value:[" << n.second << "]\n";
     }
 
+    file.close();
+
     return map;
 }
 

@@ -8,7 +8,12 @@
 #include <string.h>
 #include <unordered_map>
 
+#define MAX_HOSTNAME_LEN 256
+
 class ISIS {
+    int my_id;
+
+
 public:
     ISIS(const std::unordered_map<std::string, int>&, int, int);
     void broadcast();
