@@ -32,7 +32,7 @@ std::unordered_map<std::string, int> parsePath(std::string paths) {
     return map;
 }
 
-std::tuple<std::unordered_map<std::string, int>, int, int> handle_input(int argc, char **argv)
+std::tuple<std::unordered_map<std::string, int>, std::string, int> handle_input(int argc, char **argv)
 {
     auto logger = spdlog::get("console");
 
@@ -40,7 +40,7 @@ std::tuple<std::unordered_map<std::string, int>, int, int> handle_input(int argc
     int pflag = 0;
     int hflag = 0;
     int cflag = 0;
-    int portNum = 0;
+    std::string portNum;
     char *path;
     int count = 0;
     std::unordered_map<std::string, int> neighbors;
@@ -48,7 +48,7 @@ std::tuple<std::unordered_map<std::string, int>, int, int> handle_input(int argc
     while ((option = getopt(argc, argv, "p:h:c:")) != -1) {
         switch (option) {
             case 'p':
-                portNum = atoi(optarg);
+                portNum = optarg;
                 pflag = 1;
                 break;
             case 'h':
@@ -76,7 +76,7 @@ std::tuple<std::unordered_map<std::string, int>, int, int> handle_input(int argc
         exit(1);
     }
 
-    if (portNum < 1024 ||  portNum > 65535) {
+    if (stoi(portNum) < 1024 ||  stoi(portNum) > 65535) {
         logger -> error("PortNumber out of range", portNum);
         exit(1);
     }

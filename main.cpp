@@ -20,7 +20,7 @@ int main (int argc, char **argv) {
     console->info("welcome, starting program!") ;
 
     std::unordered_map<std::string, int> hostname_to_id;
-    int port;
+    std::string port;
     int count;
 
     std::tie(hostname_to_id, port, count) = handle_input(argc, argv);

@@ -9,5 +9,5 @@
 using namespace std;
 
 unordered_map<string, int> parsePath(string paths);
-tuple<unordered_map<string, int>, int, int> handle_input(int argc, char **argv);
+tuple<unordered_map<string, int>, string, int> handle_input(int argc, char **argv);
 #endif //ISIS_LAMPORT_PARSE_H
