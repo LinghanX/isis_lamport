@@ -55,11 +55,12 @@ enum msg_type {
 class ISIS {
 protected:
     uint32_t my_id; // current process's id
-    int msg_count; // number of message that needs to be delivered
-    int msg_sent; // number of message that has been sent
+    uint32_t msg_count; // number of message that needs to be delivered
+    uint32_t ack_count;
+    uint32_t msg_sent; // number of message that has been sent
+    uint32_t curr_seq; // sequence number
     int listening_fd; // file descriptor
     state curr_state; // an enum to keep track of current state
-
     // a flag to indicate if its allowed to send msg;
     bool isblocked;
 
@@ -67,7 +68,7 @@ protected:
     // past_msg is indicated by < sender_id, msg_id >
     std::vector<std::tuple<int, int>> past_msgs;
     std::vector<int> seq; // a vector of sequence num
-    std::vector<bool> ack; // a vector of ackowledgement
+    std::vector<uint32_t > proposals; // a vector that record the proposed seq number
     std::vector<CachedMsg> msg_q;
     // a msg_q is a queue of CachedMsg
     std::unordered_map<std::string, int> hostname_to_id;
@@ -88,7 +89,11 @@ protected:
     void enque_msg(DataMessage* msg);
     void handle_q_change();
     void deliver_msg(CachedMsg *msg);
+    uint32_t get_final_seq();
+    void broadcast_final_seq(SeqMessage* msg);
+    SeqMessage * generate_seq_msg(uint32_t seq_num, AckMessage* msg);
     AckMessage * generate_ack_msg(DataMessage* msg);
+    CachedMsg* find_msg(uint32_t msg_id, uint32_t sender_id);
 
     DataMessage* generate_data_msg();
 

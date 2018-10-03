@@ -44,11 +44,9 @@ void ISIS::init() {
 
     logger -> info("start listening on port: {}, with fd: {}", port, fd);
 }
-
 ISIS::~ISIS() {
     close(this-> listening_fd);
 }
-
 ISIS::ISIS( std::vector<std::string> &addr_book,
             std::string port,
             int msg_num)
@@ -65,7 +63,7 @@ ISIS::ISIS( std::vector<std::string> &addr_book,
     for (auto const& addr : addr_book) {
         if (addr.compare(currHostName) == 0) {
             find_id = true;
-            this -> my_id = id;
+            this -> my_id = static_cast<uint32_t>(id);
             break;
         } else id++;
     }
@@ -74,19 +72,20 @@ ISIS::ISIS( std::vector<std::string> &addr_book,
         logger -> error("unable to parse my id");
 
     this -> port = port;
-    this -> msg_count = msg_num;
+    this -> msg_count = static_cast<uint32_t>(msg_num);
     this -> addr_book = addr_book;
     this -> curr_state = sending_data_msg;
     this -> num_of_nodes = static_cast<int>(addr_book.size());
+    this -> curr_seq = 0;
+    this -> ack_count = 0;
 
     for (int i = 0; i < num_of_nodes; i++) {
         this -> seq.push_back(0);
-        this -> ack.push_back(false);
+        this -> proposals.push_back(-1);
     }
 
     start();
 }
-
 DataMessage* ISIS::generate_data_msg() {
     auto *msg = new DataMessage;
     msg -> type = 1;
@@ -96,7 +95,6 @@ DataMessage* ISIS::generate_data_msg() {
 
     return msg;
 }
-
 void ISIS::broadcast_data_msg() {
     struct timeval start;
     uint32_t elapsed_time = 0;
@@ -133,10 +131,9 @@ void ISIS::broadcast_data_msg() {
     delete(msg);
 
     this -> msg_sent += 1;
-    this -> curr_state = waiting_ack;
+    this -> curr_state = receiving_msg;
     logger -> info("all data message successfully sent");
 }
-
 bool ISIS::send_msg(void *msg, std::string addr, uint32_t size) {
     const auto logger = spdlog::get("console");
     logger -> info("start sending message to addr");
@@ -183,7 +180,6 @@ bool ISIS::send_msg(void *msg, std::string addr, uint32_t size) {
 void ISIS::increment_seq() {
     this -> seq[this -> my_id] += 1;
 }
-
 void ISIS::recv_msg() {
     const auto logger = spdlog::get("console");
     logger -> info("start receiving message");
@@ -215,9 +211,79 @@ void ISIS::recv_msg() {
             }
             break;
         }
+        case msg_type::ack:
+        {
+            AckMessage* ack_msg = ntoh((AckMessage *) buffer);
+
+            if (this -> proposals[ack_msg -> proposer] != -1) {
+                logger -> info("the ackowledgement has been received before");
+            } else {
+                this -> proposals[ack_msg -> proposer] = ack_msg -> proposed_seq;
+                this -> ack_count += 1;
+
+                if (this -> ack_count == this -> num_of_nodes) {
+                    uint32_t final_seq = static_cast<uint32_t>(
+                            *std::max_element(proposals.begin(), proposals.end()));
+                    SeqMessage* seq_msg = generate_seq_msg(final_seq, ack_msg);
+                    broadcast_final_seq(seq_msg);
+                }
+            }
+            break;
+        }
+        case msg_type::seq:
+        {
+            SeqMessage* seq_msg = ntoh((SeqMessage *) buffer);
+            this -> curr_seq = std::max(this -> curr_seq, seq_msg -> final_seq);
+            CachedMsg* msg_to_be_changed = find_msg(seq_msg -> msg_id, seq_msg -> sender);
+            if (msg_to_be_changed == nullptr) {
+                logger -> error("unable to find the message");
+            } else {
+                msg_to_be_changed ->sequence_num = seq_msg -> final_seq;
+                msg_to_be_changed -> proposer = seq_msg -> final_seq_proposer;
+                msg_to_be_changed -> deliverable = true;
+
+                this -> handle_q_change();
+            }
+            break;
+        }
     }
 }
+CachedMsg* ISIS::find_msg(uint32_t msg_id, uint32_t sender_id) {
+    const auto logger = spdlog::get("console");
+    CachedMsg* target;
+    for (auto & n : this -> msg_q) {
+        uint32_t id = n.message_id;
+        uint32_t sender = n.sender_id;
 
+        if (id == msg_id && sender_id == sender) {
+            target = &n;
+        }
+    }
+    if (target == nullptr) {
+        logger -> error("unable to find the message");
+    }
+    return target;
+}
+
+void ISIS::broadcast_final_seq(SeqMessage* msg){
+    SeqMessage* seq_msg = hton(msg);
+    if (seq_msg != nullptr) {
+        for (uint32_t id = 0; id < this -> num_of_nodes; id ++) {
+            if (id == this -> my_id) continue;
+            send_msg(seq_msg, addr_book[id], sizeof(SeqMessage));
+        }
+        delete(seq_msg);
+    }
+}
+SeqMessage* ISIS::generate_seq_msg(uint32_t seq_num, AckMessage* ack_msg) {
+    SeqMessage* msg = new SeqMessage;
+    msg -> type = 3;
+    msg -> sender = ack_msg -> sender;
+    msg -> msg_id = ack_msg -> msg_id;
+    msg -> final_seq = seq_num;
+    msg -> final_seq_proposer = this -> my_id;
+    return msg;
+}
 AckMessage* ISIS::generate_ack_msg(DataMessage *msg) {
     AckMessage* ack = new AckMessage;
     ack -> type = 2;
@@ -228,7 +294,6 @@ AckMessage* ISIS::generate_ack_msg(DataMessage *msg) {
 
     return ack;
 }
-
 void ISIS::send_ack_msg(DataMessage *msg) {
     AckMessage * ack = generate_ack_msg(msg);
     hton(ack);
@@ -295,6 +360,8 @@ bool ISIS::has_duplication(DataMessage *msg) {
 msg_type ISIS::check_msg_type(void *msg, ssize_t size) {
     const auto logger = spdlog::get("console");
     uint32_t *first_int = (uint32_t *) msg;
+    *first_int = ntohl(*first_int);
+
     if (size == sizeof(DataMessage) && *first_int == 1) {
         return msg_type::data;
     } else if (size == sizeof(AckMessage) && *first_int == 2) {
@@ -307,7 +374,6 @@ msg_type ISIS::check_msg_type(void *msg, ssize_t size) {
     }
 }
 void ISIS::recv_seq() {}
-
 void ISIS::start() {
     auto logger = spdlog::get("console");
     logger -> info("start algorithm");
@@ -330,7 +396,7 @@ void ISIS::start() {
                 recv_seq();
                 break;
             default:
-                logger -> error("unknown state");
+//                logger -> error("unknown state");
                 break;
         }
     }

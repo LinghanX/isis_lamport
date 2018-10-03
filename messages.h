@@ -6,6 +6,7 @@
 #define ISIS_LAMPORT_MESSAGES_H
 
 #include <stdint.h>
+#include <arpa/inet.h>
 
 typedef struct {
     uint32_t type; // must be equal to 1
