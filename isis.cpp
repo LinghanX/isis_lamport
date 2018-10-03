@@ -183,7 +183,129 @@ bool ISIS::send_msg(void *msg, std::string addr, uint32_t size) {
 void ISIS::increment_seq() {
     this -> seq[this -> my_id] += 1;
 }
-void ISIS::recv_ack() {}
+
+void ISIS::recv_msg() {
+    const auto logger = spdlog::get("console");
+    logger -> info("start receiving message");
+    char buffer[BUFFER_SIZE];
+    ssize_t num_bytes;
+    struct sockaddr_in neighbor;
+    socklen_t addr_len = sizeof(neighbor);
+
+    if ((num_bytes = recvfrom(
+            this -> listening_fd,
+            buffer,
+            BUFFER_SIZE,
+            MSG_DONTWAIT,
+            (struct sockaddr *) &neighbor,
+            &addr_len)) < 0 )
+    {
+        logger -> error("unable to receive message");
+    }
+
+    msg_type type = check_msg_type(buffer, num_bytes);
+    switch (type) {
+        case msg_type::data:
+        {
+            DataMessage* msg = ntoh((DataMessage *) buffer);
+            if(!has_duplication(msg)) {
+                this -> seq[this -> my_id] += 1;
+                send_ack_msg(msg);
+                enque_msg(msg);
+            }
+            break;
+        }
+    }
+}
+
+AckMessage* ISIS::generate_ack_msg(DataMessage *msg) {
+    AckMessage* ack = new AckMessage;
+    ack -> type = 2;
+    ack -> sender = msg -> sender;
+    ack -> msg_id = msg -> msg_id;
+    ack -> proposed_seq = static_cast<uint32_t>(this -> seq[this -> my_id]);
+    ack -> proposer = this -> my_id;
+
+    return ack;
+}
+
+void ISIS::send_ack_msg(DataMessage *msg) {
+    AckMessage * ack = generate_ack_msg(msg);
+    hton(ack);
+
+    if (ack != nullptr) {
+        send_msg(ack, addr_book[msg -> sender], sizeof(AckMessage));
+        delete(ack);
+    }
+}
+void ISIS::enque_msg(DataMessage *msg) {
+    CachedMsg *cache_msg = new CachedMsg;
+    cache_msg -> data = msg -> data;
+    cache_msg -> message_id = msg -> msg_id;
+    cache_msg -> sender_id = msg -> sender;
+    cache_msg -> sequence_num = static_cast<uint32_t>(this -> seq[this -> my_id]);
+    cache_msg -> proposer = this -> my_id;
+    cache_msg -> deliverable = false;
+
+    this -> msg_q.push_back(*cache_msg);
+    this -> handle_q_change();
+}
+void ISIS::handle_q_change() {
+    std::sort(
+            this -> msg_q.begin(),
+            this -> msg_q.end(),
+            [] (CachedMsg a, CachedMsg b) {
+                if (a.sequence_num != b.sequence_num) {
+                    return a.sequence_num < b.sequence_num;
+                } else if (a.deliverable == b.deliverable) {
+                    return a.proposer < b.proposer;
+                } else {
+                    return !a.deliverable;
+                }
+            });
+
+    while (!this -> msg_q.empty() && this -> msg_q.front().deliverable) {
+        CachedMsg first_msg = msg_q.front();
+        deliver_msg(&first_msg);
+        this -> msg_q.erase(this -> msg_q.begin());
+    }
+}
+void ISIS::deliver_msg(CachedMsg *msg) {
+    std::cout << this -> my_id << ": "
+    << "Processed message " << msg -> message_id << " from sender "
+    << msg -> sender_id << " with seq " << msg -> sequence_num << ", "
+    << msg -> proposer << std::endl;
+    free(msg);
+}
+bool ISIS::has_duplication(DataMessage *msg) {
+    if (this->past_msgs.empty()) return false;
+    int curr_sender_id = msg -> sender;
+    int curr_msg_id = msg -> msg_id;
+    for (const auto &n : this -> past_msgs) {
+        int sender_id = std::get<0>(n);
+        int msg_id = std::get<1>(n);
+
+        if (sender_id == curr_sender_id && msg_id == curr_msg_id) {
+            return true;
+        }
+    }
+    this -> past_msgs.emplace_back(curr_sender_id, curr_msg_id);
+    return false;
+}
+msg_type ISIS::check_msg_type(void *msg, ssize_t size) {
+    const auto logger = spdlog::get("console");
+    uint32_t *first_int = (uint32_t *) msg;
+    if (size == sizeof(DataMessage) && *first_int == 1) {
+        return msg_type::data;
+    } else if (size == sizeof(AckMessage) && *first_int == 2) {
+        return msg_type::ack;
+    } else if (size == sizeof(SeqMessage) && *first_int == 3) {
+        return msg_type::seq;
+    } else {
+        logger -> error("unable to identify incoming message");
+        return msg_type::unknown;
+    }
+}
 void ISIS::recv_seq() {}
 
 void ISIS::start() {
@@ -201,8 +323,8 @@ void ISIS::start() {
             case sending_data_msg:
                 broadcast_data_msg();
                 break;
-            case waiting_ack:
-                recv_ack();
+            case receiving_msg:
+                recv_msg();
                 break;
             case waiting_seq:
                 recv_seq();

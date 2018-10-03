@@ -34,12 +34,13 @@ struct CachedMsg {
     uint32_t message_id;
     uint32_t sender_id;
     uint32_t sequence_num;
-    uint32_t my_id;
+    uint32_t proposer;
     bool deliverable;
 };
 
 enum state {
     sending_data_msg,
+    receiving_msg,
     waiting_ack,
     waiting_seq
 };
@@ -47,7 +48,8 @@ enum state {
 enum msg_type {
     data,
     ack,
-    seq
+    seq,
+    unknown
 };
 
 class ISIS {
@@ -62,21 +64,31 @@ protected:
     bool isblocked;
 
     std::string port; // port number
+    // past_msg is indicated by < sender_id, msg_id >
+    std::vector<std::tuple<int, int>> past_msgs;
     std::vector<int> seq; // a vector of sequence num
     std::vector<bool> ack; // a vector of ackowledgement
-    // a msg_q is a queue of CachedMsg
     std::vector<CachedMsg> msg_q;
+    // a msg_q is a queue of CachedMsg
     std::unordered_map<std::string, int> hostname_to_id;
     std::vector<std::string> addr_book;
     // a map that stores message_id -> (sequence number, proposer id)
     std::unordered_map<int, std::vector<std::tuple<int, int>>> map;
+
     void init();
     void broadcast_data_msg();
-    void recv_ack();
+    void recv_msg();
     void recv_seq();
     int num_of_nodes; // total number of processes
     void increment_seq();
     bool send_msg(void *msg, std::string addr, uint32_t size);
+    msg_type check_msg_type(void * msg, ssize_t size);
+    bool has_duplication(DataMessage *msg);
+    void send_ack_msg(DataMessage* msg);
+    void enque_msg(DataMessage* msg);
+    void handle_q_change();
+    void deliver_msg(CachedMsg *msg);
+    AckMessage * generate_ack_msg(DataMessage* msg);
 
     DataMessage* generate_data_msg();
 
