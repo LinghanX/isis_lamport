@@ -30,6 +30,13 @@ typedef struct {
     uint32_t final_seq; // the final sequence number selected
     // the process id of the proposer who proposed the final seq
     uint32_t final_seq_proposer;
-} SqeMessage;
+} SeqMessage;
+
+DataMessage* hton(DataMessage* msg);
+DataMessage* ntoh(DataMessage* msg);
+AckMessage* hton(AckMessage* msg);
+AckMessage* ntoh(AckMessage* msg);
+SeqMessage* hton(SeqMessage* msg);
+SeqMessage* ntoh(SeqMessage* msg);
 
 #endif //ISIS_LAMPORT_MESSAGES_H

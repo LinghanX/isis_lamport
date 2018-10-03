@@ -14,25 +14,25 @@
 #include <iostream>
 #include <unordered_map>
 
-std::unordered_map<std::string, int> parsePath(std::string paths) {
-    std::unordered_map<std::string, int> map;
+std::vector<std::string> parsePath(std::string paths) {
+    std::vector<std::string> addr_book;
     std::ifstream file(paths);
     std::string str;
     int counter = 1;
     while (std::getline(file, str))
     {
-        map[str] = counter++;
+        addr_book.push_back(str);
     }
-    for( const auto& n : map ) {
-        std::cout << "Key:[" << n.first << "] Value:[" << n.second << "]\n";
-    }
+//    for( const auto& n : addr_book ) {
+//        std::cout << n << endl;
+//    }
 
     file.close();
 
-    return map;
+    return addr_book;
 }
 
-std::tuple<std::unordered_map<std::string, int>, std::string, int> handle_input(int argc, char **argv)
+std::tuple<std::vector<std::string>, std::string, int> handle_input(int argc, char **argv)
 {
     auto logger = spdlog::get("console");
 
@@ -43,7 +43,7 @@ std::tuple<std::unordered_map<std::string, int>, std::string, int> handle_input(
     std::string portNum;
     char *path;
     int count = 0;
-    std::unordered_map<std::string, int> neighbors;
+    std::vector<std::string> neighbors;
 
     while ((option = getopt(argc, argv, "p:h:c:")) != -1) {
         switch (option) {
