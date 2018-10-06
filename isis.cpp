@@ -209,6 +209,8 @@ void ISIS::recv_msg() {
         case msg_type::data:
         {
             DataMessage* msg = ntoh((DataMessage *) buffer);
+            logger -> info("received data message id: {}, sender: {}",
+                           msg ->msg_id, msg ->sender);
             if(!has_duplication(msg)) {
                 this -> seq[this -> my_id] += 1;
                 send_ack_msg(msg);
