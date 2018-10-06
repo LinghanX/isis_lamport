@@ -39,10 +39,9 @@ struct CachedMsg {
 };
 
 enum state {
+    establishing_connection,
     sending_data_msg,
-    receiving_msg,
-    waiting_ack,
-    waiting_seq
+    receiving_msg
 };
 
 enum msg_type {
@@ -59,10 +58,15 @@ protected:
     uint32_t ack_count;
     uint32_t msg_sent; // number of message that has been sent
     uint32_t curr_seq; // sequence number
+    bool sending_blocked; // when waiting for ackowledgement, sending msg is blocked
     int listening_fd; // file descriptor
     state curr_state; // an enum to keep track of current state
     // a flag to indicate if its allowed to send msg;
     bool isblocked;
+
+    // to keep track of elapsed time
+    std::chrono::steady_clock::time_point start_time;
+    std::chrono::steady_clock::time_point end_time;
 
     std::string port; // port number
     // past_msg is indicated by < sender_id, msg_id >
@@ -76,10 +80,11 @@ protected:
     // a map that stores message_id -> (sequence number, proposer id)
     std::unordered_map<int, std::vector<std::tuple<int, int>>> map;
 
+    long long int calc_elapsed_time();
+    void broadcast_msg_to_timeout_nodes();
     void init();
     void broadcast_data_msg();
     void recv_msg();
-    void recv_seq();
     int num_of_nodes; // total number of processes
     void increment_seq();
     bool send_msg(void *msg, std::string addr, uint32_t size);
@@ -91,6 +96,8 @@ protected:
     void deliver_msg(CachedMsg *msg);
     uint32_t get_final_seq();
     void broadcast_final_seq(SeqMessage* msg);
+    void establish_connection();
+    void assess_next_state();
     SeqMessage * generate_seq_msg(uint32_t seq_num, AckMessage* msg);
     AckMessage * generate_ack_msg(DataMessage* msg);
     CachedMsg* find_msg(uint32_t msg_id, uint32_t sender_id);

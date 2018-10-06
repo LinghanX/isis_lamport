@@ -131,7 +131,6 @@ void ISIS::broadcast_data_msg() {
     delete(msg);
 
     this -> msg_sent += 1;
-    this -> curr_state = receiving_msg;
     logger -> info("all data message successfully sent");
 }
 bool ISIS::send_msg(void *msg, std::string addr, uint32_t size) {
@@ -246,6 +245,9 @@ void ISIS::recv_msg() {
             }
             break;
         }
+        default:
+            logger -> error("unknow type message");
+            break;
     }
 }
 CachedMsg* ISIS::find_msg(uint32_t msg_id, uint32_t sender_id) {
@@ -373,30 +375,82 @@ msg_type ISIS::check_msg_type(void *msg, ssize_t size) {
         return msg_type::unknown;
     }
 }
-void ISIS::recv_seq() {}
-void ISIS::start() {
-    auto logger = spdlog::get("console");
-    logger -> info("start algorithm");
-    char buffer[BUFFER_SIZE];
-    ssize_t byte_num;
-    struct sockaddr_in neighbor;
-    socklen_t addr_len = sizeof(struct sockaddr_in);
-    struct timeval start;
-    struct timeval end;
+void ISIS::establish_connection() {
+    // more formal connection scheme needed, for now we just wait
+    const auto logger = spdlog::get("console");
+    for (int i = 0; i < 5; i ++) {
+        sleep(1);
+        logger -> info("waiting for establishing connection, {}", i);
+    }
+}
+void ISIS::assess_next_state() {
+    const auto logger = spdlog::get("console");
+    switch (this -> curr_state) {
+        case establishing_connection:
+        {
+            if (this -> msg_sent == this -> msg_count) {
+                this -> curr_state = state::receiving_msg;
+            } else {
+                this -> curr_state = state::sending_data_msg;
+                this -> start_time = std::chrono::steady_clock::now();
+            }
+            break;
+        }
+        case sending_data_msg:
+        {
+            if (this -> isblocked && calc_elapsed_time() > TIME_OUT) {
+                broadcast_msg_to_timeout_nodes();
+            }
+            this -> curr_state = state::receiving_msg;
+            this -> start_time = std::chrono::steady_clock::now();
+            break;
+        }
+        case receiving_msg:
+        {
+            this -> end_time = std::chrono::steady_clock::now();
+            if (this -> msg_sent == this -> msg_count) {
+                this -> curr_state = state::receiving_msg;
+            } else {
+                this -> curr_state = state::sending_data_msg;
+            }
+            break;
+        }
+        default:
+            logger -> error("unknown state");
+            break;
+    }
+}
+void ISIS::broadcast_msg_to_timeout_nodes() {
+    DataMessage * msg = generate_data_msg();
+    if (msg == nullptr) return;
 
+    for (uint32_t id = 0; id < this -> num_of_nodes; id++) {
+        if (id == this -> my_id || this -> proposals[id] != -1) continue;
+        send_msg(msg, addr_book[id], sizeof(DataMessage));
+    }
+}
+long long int ISIS::calc_elapsed_time() {
+     return std::chrono::duration_cast<std::chrono::microseconds>(
+             this -> end_time - this -> start_time).count();
+}
+void ISIS::start() {
+    const auto logger = spdlog::get("console");
     while (true) {
         switch (curr_state) {
+            case establishing_connection:
+                establish_connection();
+                assess_next_state();
+                break;
             case sending_data_msg:
                 broadcast_data_msg();
+                assess_next_state();
                 break;
             case receiving_msg:
                 recv_msg();
-                break;
-            case waiting_seq:
-                recv_seq();
+                assess_next_state();
                 break;
             default:
-//                logger -> error("unknown state");
+                logger -> error("unknown state");
                 break;
         }
     }
