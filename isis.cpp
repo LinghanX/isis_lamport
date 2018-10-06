@@ -52,7 +52,6 @@ ISIS::ISIS( std::vector<std::string> &addr_book,
             int msg_num)
 {
     auto logger = spdlog::get("console");
-    logger -> info("initiating ISIS");
     char currHostName[MAX_HOSTNAME_LEN]; // my name
     if (gethostname(currHostName, MAX_HOSTNAME_LEN) < 0) {
         logger -> error("not able to get my host name");
@@ -82,6 +81,10 @@ ISIS::ISIS( std::vector<std::string> &addr_book,
         this -> proposals.push_back(-1);
     }
     init();
+    logger -> info("initiating ISIS with curr_state: {}", this -> curr_state);
+    logger -> info("initiating ISIS with msg count: {}", this -> msg_count);
+    logger -> info("initiating ISIS with num of nodes: {}", this -> num_of_nodes);
+    logger -> info("initiating ISIS with my id: {}", this -> my_id);
 }
 DataMessage* ISIS::generate_data_msg() {
     auto *msg = new DataMessage;
