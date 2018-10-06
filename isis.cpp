@@ -178,7 +178,7 @@ void ISIS::increment_seq() {
 }
 void ISIS::recv_msg() {
     const auto logger = spdlog::get("console");
-    logger -> info("start receiving message");
+//    logger -> info("start receiving message");
     char buffer[BUFFER_SIZE];
     ssize_t num_bytes;
     struct sockaddr_in neighbor;
@@ -192,8 +192,9 @@ void ISIS::recv_msg() {
             (struct sockaddr *) &neighbor,
             &addr_len)) < 0 )
     {
-        logger -> error("unable to receive message");
+//        logger -> error("unable to receive message");
     }
+    if (num_bytes <= 0) return;
 
     msg_type type = check_msg_type(buffer, num_bytes);
     switch (type) {
