@@ -86,6 +86,9 @@ ISIS::ISIS( std::vector<std::string> &addr_book,
     logger -> info("initiating ISIS with msg count: {}", this -> msg_count);
     logger -> info("initiating ISIS with num of nodes: {}", this -> num_of_nodes);
     logger -> info("initiating ISIS with my id: {}", this -> my_id);
+    for (const auto& n: addr_book) {
+        logger -> info("initiating ISIS with addr_book item: {}", n);
+    }
 }
 DataMessage* ISIS::generate_data_msg() {
     auto *msg = new DataMessage;
@@ -121,6 +124,7 @@ void ISIS::broadcast_data_msg() {
             if (sent) {
                 num_of_msg_send++;
                 has_sent_msg[id] = true;
+                logger -> info("message has been sent: id {}, sender: {}", msg -> msg_id, msg -> sender);
             }
             struct timeval end;
             gettimeofday(&end, nullptr);
@@ -170,7 +174,6 @@ bool ISIS::send_msg(void *msg, std::string addr, uint32_t size) {
         logger -> error("unable to send msg");
         return false;
     }
-    logger -> info("successfully sent message {}", msg);
 
     close(sock_fd);
     freeaddrinfo(res);
