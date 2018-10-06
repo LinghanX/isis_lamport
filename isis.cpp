@@ -185,7 +185,7 @@ void ISIS::increment_seq() {
 }
 void ISIS::recv_msg() {
     const auto logger = spdlog::get("console");
-    logger -> info("start receiving message");
+//    logger -> info("start receiving message");
     char buffer[BUFFER_SIZE];
     ssize_t num_bytes;
     struct sockaddr_in neighbor;
