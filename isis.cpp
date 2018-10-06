@@ -76,6 +76,7 @@ ISIS::ISIS( std::vector<std::string> &addr_book,
     this -> num_of_nodes = static_cast<int>(addr_book.size());
     this -> curr_seq = 0;
     this -> ack_count = 0;
+    this -> msg_sent = 0;
     for (int i = 0; i < num_of_nodes; i++) {
         this -> seq.push_back(0);
         this -> proposals.push_back(-1);
@@ -102,7 +103,7 @@ void ISIS::broadcast_data_msg() {
     logger -> info("start broadcasting");
     DataMessage *msg = generate_data_msg();
     int num_of_msg_send = 0;
-    std::vector<bool> msg_sent(static_cast<unsigned long>(this -> num_of_nodes), false);
+    std::vector<bool> has_sent_msg(static_cast<unsigned long>(this -> num_of_nodes), false);
 
     if (msg == nullptr)
         logger -> error("unable to allocate data message");
@@ -114,12 +115,12 @@ void ISIS::broadcast_data_msg() {
     while (num_of_msg_send < this -> num_of_nodes - 1 && elapsed_time < TIME_OUT) {
         for (uint32_t id = 0; id < this -> seq.size(); id++) {
             // nothing to do when its myself, or the msg has been sent
-            if (id == this -> my_id || msg_sent[id]) continue;
+            if (id == this -> my_id || has_sent_msg[id]) continue;
             bool sent =
                     this->send_msg(converted_msg, this->addr_book[id], sizeof(DataMessage));
             if (sent) {
                 num_of_msg_send++;
-                msg_sent[id] = true;
+                has_sent_msg[id] = true;
             }
             struct timeval end;
             gettimeofday(&end, nullptr);
@@ -181,7 +182,7 @@ void ISIS::increment_seq() {
 }
 void ISIS::recv_msg() {
     const auto logger = spdlog::get("console");
-//    logger -> info("start receiving message");
+    logger -> info("start receiving message");
     char buffer[BUFFER_SIZE];
     ssize_t num_bytes;
     struct sockaddr_in neighbor;
@@ -390,6 +391,7 @@ void ISIS::establish_connection() {
 }
 void ISIS::assess_next_state() {
     const auto logger = spdlog::get("console");
+
     switch (this -> curr_state) {
         case establishing_connection:
         {
