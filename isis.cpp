@@ -100,8 +100,8 @@ void ISIS::broadcast_data_msg() {
     struct timeval start;
     uint32_t elapsed_time = 0;
     const auto logger = spdlog::get("console");
-    logger -> info("start broadcasting");
     DataMessage *msg = generate_data_msg();
+    logger -> info("start broadcasting msg sender: {}, id: {}, type: {}", msg ->sender, msg ->msg_id, msg->type);
     int num_of_msg_send = 0;
     std::vector<bool> has_sent_msg(static_cast<unsigned long>(this -> num_of_nodes), false);
 
@@ -136,7 +136,7 @@ void ISIS::broadcast_data_msg() {
 }
 bool ISIS::send_msg(void *msg, std::string addr, uint32_t size) {
     const auto logger = spdlog::get("console");
-    logger -> info("start sending message to addr");
+    logger -> info("start sending message to addr {}", addr);
 
     int sock_fd, status, num_bytes;
     struct addrinfo hint, *res, *res0;
@@ -147,7 +147,7 @@ bool ISIS::send_msg(void *msg, std::string addr, uint32_t size) {
     hint.ai_flags = AI_PASSIVE;
 
     if ( (status = getaddrinfo(addr.c_str(), this -> port.c_str(), &hint, &res)) < 0 ) {
-        logger -> error("unable to get host address");
+        logger -> error("unable to get host address {}");
         return false;
     }
 
