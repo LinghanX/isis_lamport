@@ -137,6 +137,7 @@ void ISIS::broadcast_data_msg() {
 
     this -> msg_sent += 1;
     logger -> info("all data message successfully sent");
+    this -> isblocked = true; // blocked waiting for ackowledgement
 }
 bool ISIS::send_msg(void *msg, std::string addr, uint32_t size) {
     const auto logger = spdlog::get("console");
@@ -151,7 +152,7 @@ bool ISIS::send_msg(void *msg, std::string addr, uint32_t size) {
     hint.ai_flags = AI_PASSIVE;
 
     if ( (status = getaddrinfo(addr.c_str(), this -> port.c_str(), &hint, &res)) < 0 ) {
-        logger -> error("unable to get host address {}");
+        logger -> error("unable to get host address {}", addr);
         return false;
     }
 
@@ -219,6 +220,11 @@ void ISIS::recv_msg() {
         {
             AckMessage* ack_msg = ntoh((AckMessage *) buffer);
 
+            logger -> info("received acknowledgement id: {}, sender: {}, propser: {}, proposed seq: {}",
+                    ack_msg ->msg_id,
+                    ack_msg ->sender,
+                    ack_msg ->proposer,
+                    ack_msg ->proposed_seq);
             if (this -> proposals[ack_msg -> proposer] != -1) {
                 logger -> info("the ackowledgement has been received before");
             } else {
