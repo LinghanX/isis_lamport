@@ -25,7 +25,7 @@ int main (int argc, char **argv) {
 
     std::tie(addr_book, port, count) = handle_input(argc, argv);
     ISIS *program = new ISIS(addr_book, port, count);
-    program -> start();
+    program->run_isis();
 
     exit(0);
 }

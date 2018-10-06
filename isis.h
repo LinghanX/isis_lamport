@@ -107,7 +107,7 @@ protected:
 public:
     ISIS(std::vector<std::string> &, std::string, int);
     ~ISIS();
-    void start();
+    void run_isis();
 };
 
 #endif //ISIS_LAMPORT_ISIS_H

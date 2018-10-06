@@ -68,23 +68,21 @@ ISIS::ISIS( std::vector<std::string> &addr_book,
         } else id++;
     }
 
-    if (!find_id)
-        logger -> error("unable to parse my id");
+    if (!find_id) logger -> error("unable to parse my id");
 
     this -> port = port;
     this -> msg_count = static_cast<uint32_t>(msg_num);
     this -> addr_book = addr_book;
-    this -> curr_state = sending_data_msg;
+    this -> curr_state = establishing_connection;
     this -> num_of_nodes = static_cast<int>(addr_book.size());
     this -> curr_seq = 0;
     this -> ack_count = 0;
-
     for (int i = 0; i < num_of_nodes; i++) {
         this -> seq.push_back(0);
         this -> proposals.push_back(-1);
     }
-
-    start();
+    init();
+    run_isis();
 }
 DataMessage* ISIS::generate_data_msg() {
     auto *msg = new DataMessage;
@@ -408,11 +406,14 @@ void ISIS::assess_next_state() {
         case receiving_msg:
         {
             this -> end_time = std::chrono::steady_clock::now();
-            if (this -> msg_sent == this -> msg_count) {
+
+            if (this -> msg_sent == this -> msg_count)
                 this -> curr_state = state::receiving_msg;
-            } else {
+            else if (this -> isblocked && calc_elapsed_time() < TIME_OUT)
+                this -> curr_state = state::receiving_msg;
+            else
                 this -> curr_state = state::sending_data_msg;
-            }
+
             break;
         }
         default:
@@ -433,7 +434,7 @@ long long int ISIS::calc_elapsed_time() {
      return std::chrono::duration_cast<std::chrono::microseconds>(
              this -> end_time - this -> start_time).count();
 }
-void ISIS::start() {
+void ISIS::run_isis() {
     const auto logger = spdlog::get("console");
     while (true) {
         switch (curr_state) {
