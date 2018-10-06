@@ -82,7 +82,6 @@ ISIS::ISIS( std::vector<std::string> &addr_book,
         this -> proposals.push_back(-1);
     }
     init();
-    run_isis();
 }
 DataMessage* ISIS::generate_data_msg() {
     auto *msg = new DataMessage;
@@ -375,10 +374,14 @@ msg_type ISIS::check_msg_type(void *msg, ssize_t size) {
 }
 void ISIS::establish_connection() {
     // more formal connection scheme needed, for now we just wait
-    const auto logger = spdlog::get("console");
-    for (int i = 0; i < 5; i ++) {
-        sleep(1);
-        logger -> info("waiting for establishing connection, {}", i);
+    if (this -> msg_count == 0) {
+        this -> curr_state = state::receiving_msg;
+    } else {
+        const auto logger = spdlog::get("console");
+        for (int i = 0; i < 5; i ++) {
+            sleep(1);
+            logger -> info("waiting for establishing connection, {}", i);
+        }
     }
 }
 void ISIS::assess_next_state() {
