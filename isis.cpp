@@ -310,7 +310,11 @@ AckMessage* ISIS::generate_ack_msg(DataMessage *msg) {
     return ack;
 }
 void ISIS::send_ack_msg(DataMessage *msg) {
+    const auto &logger = spdlog::get("console");
     AckMessage * ack = generate_ack_msg(msg);
+
+    logger -> info("sending ack msg id: {}, sender: {}, proposed seq: {}, proposer: {}",
+            ack ->msg_id, ack ->sender, ack->proposed_seq, ack->proposer);
     hton(ack);
 
     if (ack != nullptr) {
