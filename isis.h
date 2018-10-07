@@ -25,7 +25,7 @@
 #define MAX_HOSTNAME_LEN 256
 #define MAX_SOCK 128
 // in microseconds
-#define TIME_OUT 1000000
+#define TIME_OUT 5000000
 #define BUFFER_SIZE (2 * sizeof(SeqMessage))
 #define DUMMY_DATA 1;
 
