@@ -407,14 +407,11 @@ void ISIS::establish_connection() {
 void ISIS::assess_next_state() {
     const auto logger = spdlog::get("console");
 
-    logger -> info("current state is: {}", this -> curr_state);
-
     switch (this -> curr_state) {
         case establishing_connection:
         {
             if (this -> msg_sent == this -> msg_count) {
                 this -> curr_state = state::receiving_msg;
-                logger -> info("transition to state {}", this -> curr_state);
             } else {
                 this -> curr_state = state::sending_data_msg;
                 this -> start_time = std::chrono::steady_clock::now();
@@ -429,7 +426,6 @@ void ISIS::assess_next_state() {
             }
             this -> curr_state = state::receiving_msg;
             this -> start_time = std::chrono::steady_clock::now();
-            logger -> info("transition to state {}", this -> curr_state);
             break;
         }
         case receiving_msg:
@@ -440,7 +436,6 @@ void ISIS::assess_next_state() {
                 this -> curr_state = state::receiving_msg;
             } else if (this -> isblocked && calc_elapsed_time() < TIME_OUT) {
                 this -> curr_state = state::receiving_msg;
-                logger -> info("transition to state {}", this -> curr_state);
             } else {
                 this -> curr_state = state::sending_data_msg;
                 logger -> info("transition to state {}", this -> curr_state);
