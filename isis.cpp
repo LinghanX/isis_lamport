@@ -333,6 +333,7 @@ void ISIS::send_ack_msg(DataMessage *msg) {
     }
 }
 void ISIS::enque_msg(DataMessage *msg) {
+    const auto logger = spdlog::("console");
     CachedMsg *cache_msg = new CachedMsg;
     cache_msg -> data = msg -> data;
     cache_msg -> message_id = msg -> msg_id;
@@ -342,6 +343,9 @@ void ISIS::enque_msg(DataMessage *msg) {
     cache_msg -> deliverable = false;
 
     this -> msg_q.push_back(*cache_msg);
+    logger -> info("pushed message into the q: data: {}, id: {}, sender: {}, seq_num: {}, proposer: {}, deliverable: {} ",
+            cache_msg -> data, cache_msg -> message_id, cache_msg -> sender_id, cache_msg -> sequence_num,
+            cache_msg -> proposer, cache_msg -> deliverable);
     this -> handle_q_change();
 }
 void ISIS::handle_q_change() {
