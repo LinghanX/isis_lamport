@@ -333,7 +333,7 @@ void ISIS::send_ack_msg(DataMessage *msg) {
     }
 }
 void ISIS::enque_msg(DataMessage *msg) {
-    const auto logger = spdlog::("console");
+    const auto logger = spdlog::get("console");
     CachedMsg *cache_msg = new CachedMsg;
     cache_msg -> data = msg -> data;
     cache_msg -> message_id = msg -> msg_id;
