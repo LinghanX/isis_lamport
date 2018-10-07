@@ -434,7 +434,7 @@ void ISIS::assess_next_state() {
         {
             if (this -> msg_sent == this -> msg_count) {
                 this -> curr_state = state::receiving_msg;
-            } else if (this -> isblocked && calc_elapsed_time() < TIME_OUT) {
+            } else if (this -> isblocked && calc_elapsed_time() > TIME_OUT) {
                 this -> curr_state = state::receiving_msg;
             } else {
                 this -> curr_state = state::sending_data_msg;
@@ -449,6 +449,8 @@ void ISIS::assess_next_state() {
     }
 }
 void ISIS::broadcast_msg_to_timeout_nodes() {
+    const auto logger = spdlog::get("console");
+    logger -> info("resending msg");
     DataMessage * msg = generate_data_msg();
     if (msg == nullptr) return;
 
