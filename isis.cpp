@@ -517,7 +517,7 @@ void ISIS::broadcast_msg_to_timeout_nodes() {
     if (msg == nullptr) return;
 
     for (uint32_t id = 0; id < this -> num_of_nodes; id++) {
-        if (id == this -> my_id || this -> proposals.find(msg->msg_id) -> second.count(id) == 0)
+        if (id != this -> my_id || this -> proposals.find(msg->msg_id) -> second.count(id) == 0)
         send_msg(msg, addr_book[id], sizeof(DataMessage));
     }
     delete(msg);
