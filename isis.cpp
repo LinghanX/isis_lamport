@@ -512,8 +512,8 @@ void ISIS::assess_next_state() {
 }
 void ISIS::broadcast_msg_to_timeout_nodes() {
     const auto logger = spdlog::get("console");
-    logger -> info("resending msg");
     DataMessage * msg = generate_data_msg();
+    logger -> info("resending msg, id: {}, sender: {}, type: {}", msg ->msg_id, msg ->sender, msg ->type);
     if (msg == nullptr) return;
 
     for (uint32_t id = 0; id < this -> num_of_nodes; id++) {
