@@ -359,7 +359,7 @@ void ISIS::handle_q_change() {
     std::sort(
             this -> msg_q.begin(),
             this -> msg_q.end(),
-            [] (CachedMsg a, CachedMsg b) {
+            [] (const CachedMsg& a, const CachedMsg& b) {
                 if (a.sequence_num != b.sequence_num) {
                     return a.sequence_num < b.sequence_num;
                 } else if (a.deliverable == b.deliverable) {
