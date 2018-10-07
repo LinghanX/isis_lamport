@@ -513,9 +513,10 @@ void ISIS::assess_next_state() {
 void ISIS::broadcast_msg_to_timeout_nodes() {
     const auto logger = spdlog::get("console");
     DataMessage * msg = generate_data_msg();
-    logger -> info("resending msg, id: {}, sender: {}, type: {}", msg ->msg_id, msg ->sender, msg ->type);
     if (msg == nullptr) return;
 
+    logger -> info("resending msg, id: {}, sender: {}, type: {}", msg ->msg_id, msg ->sender, msg ->type);
+    hton(msg);
     for (uint32_t id = 0; id < this -> num_of_nodes; id++) {
         if (id != this -> my_id || this -> proposals.find(msg->msg_id) -> second.count(id) == 0)
         send_msg(msg, addr_book[id], sizeof(DataMessage));
