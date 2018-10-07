@@ -112,19 +112,17 @@ void ISIS::broadcast_data_msg() {
         logger -> error("unable to allocate data message");
     this -> increment_seq();
     // before we send, we need to convert message to network endian
-    auto * converted_msg = hton(msg);
-
+    hton(msg);
     // seq.size() is the total num of id;
     while (num_of_msg_send < this -> num_of_nodes - 1 && elapsed_time < TIME_OUT) {
         for (uint32_t id = 0; id < this -> seq.size(); id++) {
             // nothing to do when its myself, or the msg has been sent
             if (id == this -> my_id || has_sent_msg[id]) continue;
-            bool sent =
-                    this->send_msg(converted_msg, this->addr_book[id], sizeof(DataMessage));
+            bool sent = this->send_msg(msg, this->addr_book[id], sizeof(DataMessage));
             if (sent) {
                 num_of_msg_send++;
                 has_sent_msg[id] = true;
-                logger -> info("message has been sent: id {}, sender: {}", msg -> msg_id, msg -> sender);
+                logger -> info("message has been sent");
             }
             struct timeval end;
             gettimeofday(&end, nullptr);
@@ -175,6 +173,7 @@ bool ISIS::send_msg(void *msg, std::string addr, uint32_t size) {
         logger -> error("unable to send msg");
         return false;
     }
+    logger -> info("message successfully sent");
 
     close(sock_fd);
     freeaddrinfo(res);
