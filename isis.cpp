@@ -74,16 +74,13 @@ ISIS::ISIS( std::vector<std::string> &addr_book,
     this -> addr_book = addr_book;
     this -> curr_state = establishing_connection;
     this -> num_of_nodes = static_cast<int>(addr_book.size());
+
     this -> curr_seq = 0;
-    this -> ack_count = 0;
-    this -> msg_sent = 0;
-    for (int i = 0; i < num_of_nodes; i++) {
-        this -> seq.push_back(0);
-        this -> proposals.push_back(-1);
-    }
+    this -> counter = 0;
     init();
     logger -> info("initiating ISIS with curr_state: {}", this -> curr_state);
     logger -> info("initiating ISIS with msg count: {}", this -> msg_count);
+    logger -> info("initiating ISIS with msg sent: {}", this -> counter);
     logger -> info("initiating ISIS with num of nodes: {}", this -> num_of_nodes);
     logger -> info("initiating ISIS with my id: {}", this -> my_id);
     for (const auto& n: addr_book) {
@@ -95,13 +92,11 @@ DataMessage* ISIS::generate_data_msg() {
     msg -> type = 1;
     msg -> sender = this -> my_id;
     msg -> data = DUMMY_DATA;
-    msg -> msg_id = static_cast<uint32_t>(this -> msg_sent); // the msg_id is always num of msg sent
+    msg -> msg_id = static_cast<uint32_t>(this -> counter); // the msg_id is always num of msg sent
 
     return msg;
 }
 void ISIS::broadcast_data_msg() {
-    struct timeval start;
-    uint32_t elapsed_time = 0;
     const auto logger = spdlog::get("console");
     DataMessage *msg = generate_data_msg();
     if (msg == nullptr)
@@ -110,30 +105,24 @@ void ISIS::broadcast_data_msg() {
     int num_of_msg_send = 0;
     std::vector<bool> has_sent_msg(static_cast<unsigned long>(this -> num_of_nodes), false);
 
-    this -> increment_seq();
+    this -> counter += 1;
     // before we send, we need to convert message to network endian
     hton(msg);
     // seq.size() is the total num of id;
-    while (num_of_msg_send < this -> num_of_nodes - 1 && elapsed_time < TIME_OUT) {
-        for (uint32_t id = 0; id < this -> seq.size(); id++) {
+    while (num_of_msg_send < this -> num_of_nodes - 1) {
+        for (uint32_t id = 0; id < this -> num_of_nodes; id++) {
             // nothing to do when its myself, or the msg has been sent
             if (id == this -> my_id || has_sent_msg[id]) continue;
             bool sent = this->send_msg(msg, this->addr_book[id], sizeof(DataMessage));
             if (sent) {
                 num_of_msg_send++;
                 has_sent_msg[id] = true;
-                logger -> info("message has been sent");
+                logger -> info("message has been sent to {}", this -> addr_book[id]);
             }
-            struct timeval end;
-            gettimeofday(&end, nullptr);
-            elapsed_time = static_cast<uint32_t>(
-                    (end.tv_sec * 1000000 + end.tv_usec) -
-                    ((start).tv_sec * 1000000 + (start).tv_usec));
         }
     }
     delete(msg);
 
-    this -> msg_sent += 1;
     logger -> info("all data message successfully sent");
     this -> isblocked = true; // blocked waiting for ackowledgement
 }
@@ -180,9 +169,6 @@ bool ISIS::send_msg(void *msg, std::string addr, uint32_t size) {
 
     return true;
 }
-void ISIS::increment_seq() {
-    this -> seq[this -> my_id] += 1;
-}
 void ISIS::recv_msg() {
     const auto logger = spdlog::get("console");
 //    logger -> info("start receiving message");
@@ -211,7 +197,7 @@ void ISIS::recv_msg() {
             logger -> info("received data message id: {}, sender: {}",
                            msg ->msg_id, msg ->sender);
             if(!has_duplication(msg)) {
-                this -> seq[this -> my_id] += 1;
+                this -> curr_seq += 1;
                 send_ack_msg(msg);
                 enque_msg(msg);
             }
@@ -226,16 +212,22 @@ void ISIS::recv_msg() {
                     ack_msg ->sender,
                     ack_msg ->proposer,
                     ack_msg ->proposed_seq);
-            if (this -> proposals[ack_msg -> proposer] != -1) {
+            if (ack_has_received(ack_msg)) {
                 logger -> info("the ackowledgement has been received before");
             } else {
-                this -> proposals[ack_msg -> proposer] = ack_msg -> proposed_seq;
-                this -> ack_count += 1;
-
-                if (this -> ack_count == this -> num_of_nodes) {
-                    uint32_t final_seq = static_cast<uint32_t>(
-                            *std::max_element(proposals.begin(), proposals.end()));
-                    SeqMessage* seq_msg = generate_seq_msg(final_seq, ack_msg);
+                if (this -> proposals.count(ack_msg -> msg_id) == 0) {
+                    std::unordered_map<uint32_t, uint32_t> entry = {{ack_msg -> proposer, ack_msg -> proposed_seq}};
+                    this -> proposals[ack_msg -> msg_id] = entry;
+                } else {
+                    auto entry = this -> proposals.find(ack_msg -> msg_id);
+                    auto map = entry -> second;
+                    if (map.count(ack_msg -> proposer) != 0) {
+                        logger -> error("entry existed");
+                    }
+                    map[ack_msg -> proposer] = ack_msg -> proposed_seq;
+                }
+                if (this -> proposals.find(ack_msg -> msg_id) -> second.size() == this -> num_of_nodes - 1) {
+                    SeqMessage* seq_msg = generate_seq_msg(ack_msg);
                     broadcast_final_seq(seq_msg);
                     logger -> info("all ack has been received, final seq sent");
                 }
@@ -250,7 +242,7 @@ void ISIS::recv_msg() {
             if (msg_to_be_changed == nullptr) {
                 logger -> error("unable to find the message");
             } else {
-                msg_to_be_changed ->sequence_num = seq_msg -> final_seq;
+                msg_to_be_changed -> sequence_num = seq_msg -> final_seq;
                 msg_to_be_changed -> proposer = seq_msg -> final_seq_proposer;
                 msg_to_be_changed -> deliverable = true;
 
@@ -262,6 +254,13 @@ void ISIS::recv_msg() {
             logger -> error("unknow type message");
             break;
     }
+}
+bool ISIS::ack_has_received(AckMessage *msg) {
+    auto msg_id = msg -> msg_id;
+    if (this -> proposals.count(msg_id) == 0) return false;
+    auto entry = this -> proposals.find(msg_id);
+    if (entry -> second.count(msg -> proposer) == 0) return false;
+    return true;
 }
 CachedMsg* ISIS::find_msg(uint32_t msg_id, uint32_t sender_id) {
     const auto logger = spdlog::get("console");
@@ -290,13 +289,29 @@ void ISIS::broadcast_final_seq(SeqMessage* msg){
         delete(seq_msg);
     }
 }
-SeqMessage* ISIS::generate_seq_msg(uint32_t seq_num, AckMessage* ack_msg) {
-    SeqMessage* msg = new SeqMessage;
+SeqMessage* ISIS::generate_seq_msg(AckMessage* ack_msg) {
+    const auto logger = spdlog::get("console");
+    auto msg_id = ack_msg -> msg_id;
+    auto entry = this -> proposals.find(msg_id);
+    auto max_seq = static_cast<uint32_t>(-1);
+    auto max_proposer = static_cast<uint32_t>(-1);
+
+    for (const auto &n : entry -> second) {
+        // second: proposer, seq
+        if (n.second == max_seq && n.first < max_proposer) {
+            max_seq = n.second;
+            max_proposer = n.first;
+        } else if (n.second > max_seq) {
+            max_seq = n.second;
+            max_proposer = n.first;
+        }
+    }
+    auto * msg = new SeqMessage;
     msg -> type = 3;
     msg -> sender = ack_msg -> sender;
     msg -> msg_id = ack_msg -> msg_id;
-    msg -> final_seq = seq_num;
-    msg -> final_seq_proposer = this -> my_id;
+    msg -> final_seq = max_seq;
+    msg -> final_seq_proposer = max_proposer;
     return msg;
 }
 AckMessage* ISIS::generate_ack_msg(DataMessage *msg) {
@@ -304,7 +319,7 @@ AckMessage* ISIS::generate_ack_msg(DataMessage *msg) {
     ack -> type = 2;
     ack -> sender = msg -> sender;
     ack -> msg_id = msg -> msg_id;
-    ack -> proposed_seq = static_cast<uint32_t>(this -> seq[this -> my_id]);
+    ack -> proposed_seq = this -> curr_seq;
     ack -> proposer = this -> my_id;
 
     return ack;
@@ -327,7 +342,7 @@ void ISIS::enque_msg(DataMessage *msg) {
     cache_msg -> data = msg -> data;
     cache_msg -> message_id = msg -> msg_id;
     cache_msg -> sender_id = msg -> sender;
-    cache_msg -> sequence_num = static_cast<uint32_t>(this -> seq[this -> my_id]);
+    cache_msg -> sequence_num = this -> curr_seq;
     cache_msg -> proposer = this -> my_id;
     cache_msg -> deliverable = false;
 
@@ -335,6 +350,13 @@ void ISIS::enque_msg(DataMessage *msg) {
     this -> handle_q_change();
 }
 void ISIS::handle_q_change() {
+    const auto logger = spdlog::get("console");
+    logger -> info("handling queue: size: {}", this -> msg_q.size());
+    for (const auto &msg : this -> msg_q) {
+        logger -> info("message is id: {}, sender: {}, proposer: {}, deliverable: {}. seqnum: {}",
+                msg.message_id, msg.sender_id, msg.proposer, msg.deliverable, msg.sequence_num);
+    }
+
     std::sort(
             this -> msg_q.begin(),
             this -> msg_q.end(),
@@ -360,6 +382,7 @@ void ISIS::deliver_msg(CachedMsg *msg) {
     << msg -> sender_id << " with seq " << msg -> sequence_num << ", "
     << msg -> proposer << std::endl;
     free(msg);
+    this -> isblocked = false;
 }
 bool ISIS::has_duplication(DataMessage *msg) {
     if (this->past_msgs.empty()) return false;
@@ -410,7 +433,7 @@ void ISIS::assess_next_state() {
     switch (this -> curr_state) {
         case establishing_connection:
         {
-            if (this -> msg_sent == this -> msg_count) {
+            if (this -> counter == this -> msg_count) {
                 this -> curr_state = state::receiving_msg;
             } else if (this -> isblocked) {
                 this -> curr_state = state::receiving_msg;
@@ -432,7 +455,7 @@ void ISIS::assess_next_state() {
         }
         case receiving_msg:
         {
-            if (this -> msg_sent == this -> msg_count) {
+            if (this -> counter == this -> msg_count) {
                 this -> curr_state = state::receiving_msg;
             } else if (this -> isblocked && calc_elapsed_time() > TIME_OUT) {
                 this -> curr_state = state::receiving_msg;
@@ -455,7 +478,7 @@ void ISIS::broadcast_msg_to_timeout_nodes() {
     if (msg == nullptr) return;
 
     for (uint32_t id = 0; id < this -> num_of_nodes; id++) {
-        if (id == this -> my_id || this -> proposals[id] != -1) continue;
+        if (id == this -> my_id || this -> proposals.find(msg->msg_id) -> second.count(id) == 0)
         send_msg(msg, addr_book[id], sizeof(DataMessage));
     }
 }

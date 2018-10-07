@@ -55,30 +55,23 @@ class ISIS {
 protected:
     uint32_t my_id; // current process's id
     uint32_t msg_count; // number of message that needs to be delivered
-    uint32_t ack_count;
-    uint32_t msg_sent; // number of message that has been sent
+    uint32_t counter; // number of message that has been sent
     uint32_t curr_seq; // sequence number
-    bool sending_blocked; // when waiting for ackowledgement, sending msg is blocked
     int listening_fd; // file descriptor
     state curr_state; // an enum to keep track of current state
     // a flag to indicate if its allowed to send msg;
     bool isblocked;
-
     // to keep track of elapsed time
     std::chrono::steady_clock::time_point start_time;
     std::chrono::steady_clock::time_point end_time;
-
     std::string port; // port number
     // past_msg is indicated by < sender_id, msg_id >
     std::vector<std::tuple<int, int>> past_msgs;
-    std::vector<int> seq; // a vector of sequence num
-    std::vector<uint32_t > proposals; // a vector that record the proposed seq number
-    std::vector<CachedMsg> msg_q;
+    // map of message -> (proposer, proposed_seq)
+    std::unordered_map<uint32_t, std::unordered_map<uint32_t, uint32_t >> proposals;
     // a msg_q is a queue of CachedMsg
-    std::unordered_map<std::string, int> hostname_to_id;
+    std::vector<CachedMsg> msg_q;
     std::vector<std::string> addr_book;
-    // a map that stores message_id -> (sequence number, proposer id)
-    std::unordered_map<int, std::vector<std::tuple<int, int>>> map;
 
     long long int calc_elapsed_time();
     void broadcast_msg_to_timeout_nodes();
@@ -98,11 +91,11 @@ protected:
     void broadcast_final_seq(SeqMessage* msg);
     void establish_connection();
     void assess_next_state();
-    SeqMessage * generate_seq_msg(uint32_t seq_num, AckMessage* msg);
+    SeqMessage * generate_seq_msg(AckMessage* msg);
+    DataMessage* generate_data_msg();
     AckMessage * generate_ack_msg(DataMessage* msg);
     CachedMsg* find_msg(uint32_t msg_id, uint32_t sender_id);
-
-    DataMessage* generate_data_msg();
+    bool ack_has_received(AckMessage* msg);
 
 public:
     ISIS(std::vector<std::string> &, std::string, int);
