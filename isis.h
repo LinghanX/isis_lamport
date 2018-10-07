@@ -68,7 +68,7 @@ protected:
     // past_msg is indicated by < sender_id, msg_id >
     std::vector<std::tuple<int, int>> past_msgs;
     // map of message -> (proposer, proposed_seq)
-    std::unordered_map<uint32_t, std::unordered_map<uint32_t, uint32_t >> proposals;
+    std::unordered_map<int, std::unordered_map<int, int >> proposals;
     // a msg_q is a queue of CachedMsg
     std::vector<CachedMsg> msg_q;
     std::vector<std::string> addr_book;
