@@ -104,12 +104,12 @@ void ISIS::broadcast_data_msg() {
     uint32_t elapsed_time = 0;
     const auto logger = spdlog::get("console");
     DataMessage *msg = generate_data_msg();
+    if (msg == nullptr)
+        logger -> error("unable to allocate data message");
     logger -> info("start broadcasting msg sender: {}, id: {}, type: {}", msg ->sender, msg ->msg_id, msg->type);
     int num_of_msg_send = 0;
     std::vector<bool> has_sent_msg(static_cast<unsigned long>(this -> num_of_nodes), false);
 
-    if (msg == nullptr)
-        logger -> error("unable to allocate data message");
     this -> increment_seq();
     // before we send, we need to convert message to network endian
     hton(msg);
@@ -237,6 +237,7 @@ void ISIS::recv_msg() {
                             *std::max_element(proposals.begin(), proposals.end()));
                     SeqMessage* seq_msg = generate_seq_msg(final_seq, ack_msg);
                     broadcast_final_seq(seq_msg);
+                    logger -> info("all ack has been received, final seq sent");
                 }
             }
             break;
@@ -406,14 +407,18 @@ void ISIS::establish_connection() {
 void ISIS::assess_next_state() {
     const auto logger = spdlog::get("console");
 
+    logger -> info("current state is: {}", this -> curr_state);
+
     switch (this -> curr_state) {
         case establishing_connection:
         {
             if (this -> msg_sent == this -> msg_count) {
                 this -> curr_state = state::receiving_msg;
+                logger -> info("transition to state {}", this -> curr_state);
             } else {
                 this -> curr_state = state::sending_data_msg;
                 this -> start_time = std::chrono::steady_clock::now();
+                logger -> info("transition to state {}", this -> curr_state);
             }
             break;
         }
@@ -424,18 +429,22 @@ void ISIS::assess_next_state() {
             }
             this -> curr_state = state::receiving_msg;
             this -> start_time = std::chrono::steady_clock::now();
+            logger -> info("transition to state {}", this -> curr_state);
             break;
         }
         case receiving_msg:
         {
             this -> end_time = std::chrono::steady_clock::now();
 
-            if (this -> msg_sent == this -> msg_count)
+            if (this -> msg_sent == this -> msg_count) {
                 this -> curr_state = state::receiving_msg;
-            else if (this -> isblocked && calc_elapsed_time() < TIME_OUT)
+            } else if (this -> isblocked && calc_elapsed_time() < TIME_OUT) {
                 this -> curr_state = state::receiving_msg;
-            else
+                logger -> info("transition to state {}", this -> curr_state);
+            } else {
                 this -> curr_state = state::sending_data_msg;
+                logger -> info("transition to state {}", this -> curr_state);
+            }
 
             break;
         }
