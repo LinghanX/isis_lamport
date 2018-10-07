@@ -305,13 +305,15 @@ SeqMessage* ISIS::generate_seq_msg(AckMessage* ack_msg) {
     auto max_proposer = static_cast<uint32_t>(-1);
 
     for (const auto &n : entry -> second) {
+        auto proposer_id = n.first;
+        auto proposer_seq = n.second;
         // second: proposer, seq
-        if (n.second == max_seq && n.first < max_proposer) {
-            max_seq = n.second;
-            max_proposer = n.first;
-        } else if (n.second > max_seq) {
-            max_seq = n.second;
-            max_proposer = n.first;
+        if (proposer_seq == max_seq && proposer_id < max_proposer) {
+            max_seq = proposer_seq;
+            max_proposer = proposer_id;
+        } else if (proposer_seq > max_seq) {
+            max_seq = proposer_seq;
+            max_proposer = proposer_id;
         }
     }
     auto * msg = new SeqMessage;
@@ -320,6 +322,7 @@ SeqMessage* ISIS::generate_seq_msg(AckMessage* ack_msg) {
     msg -> msg_id = ack_msg -> msg_id;
     msg -> final_seq = max_seq;
     msg -> final_seq_proposer = max_proposer;
+    logger -> critical("proposed msg: final seq {}, final prop: {}", max_seq, max_proposer);
     return msg;
 }
 AckMessage* ISIS::generate_ack_msg(DataMessage *msg) {
