@@ -95,6 +95,7 @@ protected:
     DataMessage* generate_data_msg();
     AckMessage * generate_ack_msg(DataMessage* msg);
     CachedMsg* find_msg(uint32_t msg_id, uint32_t sender_id);
+    void handle_seq_msg(SeqMessage* msg);
     bool ack_has_received(AckMessage* msg);
 
 public:

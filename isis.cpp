@@ -106,6 +106,8 @@ void ISIS::broadcast_data_msg() {
     std::vector<bool> has_sent_msg(static_cast<unsigned long>(this -> num_of_nodes), false);
 
     this -> counter += 1;
+    // send the message to myself;
+    enque_msg(msg);
     // before we send, we need to convert message to network endian
     hton(msg);
     // seq.size() is the total num of id;
@@ -232,26 +234,30 @@ void ISIS::recv_msg() {
         case msg_type::seq:
         {
             SeqMessage* seq_msg = ntoh((SeqMessage *) buffer);
-            logger -> info("received seq msg: id {}, sender: {}, final seq: {}, final proposer: {}",
-                    seq_msg ->msg_id, seq_msg ->sender, seq_msg ->final_seq, seq_msg ->final_seq_proposer);
-            this -> curr_seq = std::max(this -> curr_seq, seq_msg -> final_seq);
-            CachedMsg* msg_to_be_changed = find_msg(seq_msg -> msg_id, seq_msg -> sender);
-            if (msg_to_be_changed == nullptr) {
-                logger -> error("unable to find the message");
-            } else {
-                msg_to_be_changed -> sequence_num = seq_msg -> final_seq;
-                msg_to_be_changed -> proposer = seq_msg -> final_seq_proposer;
-                msg_to_be_changed -> deliverable = true;
-
-                logger -> info("changing element upon final seq, msg is id: {}, seq num: {}, proposer: {}",
-                        msg_to_be_changed ->message_id, msg_to_be_changed ->sequence_num, msg_to_be_changed->proposer);
-                this -> handle_q_change();
-            }
+            handle_seq_msg(seq_msg);
             break;
         }
         default:
             logger -> error("unknow type message");
             break;
+    }
+}
+void ISIS::handle_seq_msg(SeqMessage* seq_msg) {
+    const auto logger = spdlog::get("console");
+    logger -> info("received seq msg: id {}, sender: {}, final seq: {}, final proposer: {}",
+                   seq_msg ->msg_id, seq_msg ->sender, seq_msg ->final_seq, seq_msg ->final_seq_proposer);
+    this -> curr_seq = std::max(this -> curr_seq, seq_msg -> final_seq);
+    CachedMsg* msg_to_be_changed = find_msg(seq_msg -> msg_id, seq_msg -> sender);
+    if (msg_to_be_changed == nullptr) {
+        logger -> error("unable to find the message");
+    } else {
+        msg_to_be_changed -> sequence_num = seq_msg -> final_seq;
+        msg_to_be_changed -> proposer = seq_msg -> final_seq_proposer;
+        msg_to_be_changed -> deliverable = true;
+
+        logger -> info("changing element upon final seq, msg is id: {}, seq num: {}, proposer: {}",
+                       msg_to_be_changed ->message_id, msg_to_be_changed ->sequence_num, msg_to_be_changed->proposer);
+        this -> handle_q_change();
     }
 }
 bool ISIS::ack_has_received(AckMessage *msg) {
@@ -282,21 +288,22 @@ void ISIS::broadcast_final_seq(SeqMessage* msg){
     const auto logger = spdlog::get("console");
     logger -> info ("broadcasting seq msg, id: {}, sender: {}, final seq: {}, final proposer: {}"
             , msg ->msg_id, msg ->sender, msg ->final_seq, msg ->final_seq_proposer);
+    char buffer[sizeof(SeqMessage)];
+    memcpy(buffer, msg, sizeof(SeqMessage));
 
-    std::cout << this -> my_id << ": "
-              << "Processed message " << msg -> msg_id << " from sender "
-              << msg -> sender << " with seq " << msg -> final_seq << ", "
-              << msg -> final_seq_proposer << std::endl;
+//    std::cout << this -> my_id << ": "
+//              << "Processed message " << msg -> msg_id << " from sender "
+//              << msg -> sender << " with seq " << msg -> final_seq << ", "
+//              << msg -> final_seq_proposer << std::endl;
+    handle_seq_msg((SeqMessage *)buffer);
 
     this -> isblocked = false;
-
     SeqMessage* seq_msg = hton(msg);
     if (seq_msg != nullptr) {
         for (uint32_t id = 0; id < this -> num_of_nodes; id ++) {
             if (id == this -> my_id) continue;
             send_msg(seq_msg, addr_book[id], sizeof(SeqMessage));
         }
-        delete(seq_msg);
     }
 }
 SeqMessage* ISIS::generate_seq_msg(AckMessage* ack_msg) {
@@ -402,7 +409,7 @@ void ISIS::handle_q_change() {
 }
 void ISIS::deliver_msg(CachedMsg *msg) {
     const auto logger = spdlog::get("console");
-    logger -> info("start delivering msg");
+    logger -> critical("start delivering msg");
     std::cout << this -> my_id << ": "
     << "Processed message " << msg -> message_id << " from sender "
     << msg -> sender_id << " with seq " << msg -> sequence_num << ", "
@@ -514,6 +521,7 @@ void ISIS::broadcast_msg_to_timeout_nodes() {
         if (id == this -> my_id || this -> proposals.find(msg->msg_id) -> second.count(id) == 0)
         send_msg(msg, addr_book[id], sizeof(DataMessage));
     }
+    delete(msg);
 }
 long long int ISIS::calc_elapsed_time() {
      return std::chrono::duration_cast<std::chrono::microseconds>(
