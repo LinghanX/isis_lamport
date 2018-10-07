@@ -432,8 +432,6 @@ void ISIS::assess_next_state() {
         }
         case receiving_msg:
         {
-            this -> end_time = std::chrono::steady_clock::now();
-
             if (this -> msg_sent == this -> msg_count) {
                 this -> curr_state = state::receiving_msg;
             } else if (this -> isblocked && calc_elapsed_time() < TIME_OUT) {
@@ -461,7 +459,7 @@ void ISIS::broadcast_msg_to_timeout_nodes() {
 }
 long long int ISIS::calc_elapsed_time() {
      return std::chrono::duration_cast<std::chrono::microseconds>(
-             this -> end_time - this -> start_time).count();
+             std::chrono::steady_clock::now() - this -> start_time).count();
 }
 void ISIS::run_isis() {
     const auto logger = spdlog::get("console");
