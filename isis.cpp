@@ -215,17 +215,12 @@ void ISIS::recv_msg() {
             if (ack_has_received(ack_msg)) {
                 logger -> info("the ackowledgement has been received before");
             } else {
-                if (this -> proposals.count(ack_msg -> msg_id) == 0) {
-                    std::unordered_map<uint32_t, uint32_t> entry = {{ack_msg -> proposer, ack_msg -> proposed_seq}};
-                    this -> proposals[ack_msg -> msg_id] = entry;
-                } else {
-                    auto entry = this -> proposals.find(ack_msg -> msg_id);
-                    auto map = entry -> second;
-                    if (map.count(ack_msg -> proposer) != 0) {
-                        logger -> error("entry existed");
-                    }
-                    map[ack_msg -> proposer] = ack_msg -> proposed_seq;
-                }
+//                if (this -> proposals.count(ack_msg -> msg_id) == 0) {
+//                    std::unordered_map<uint32_t, uint32_t> entry = {{ack_msg -> proposer, ack_msg -> proposed_seq}};
+//                    this -> proposals[ack_msg -> msg_id] = entry;
+//                } else {
+                this -> proposals[ack_msg -> msg_id][ack_msg -> proposer] = ack_msg -> proposed_seq;
+//                }
                 if (this -> proposals.find(ack_msg -> msg_id) -> second.size() == this -> num_of_nodes - 1) {
                     SeqMessage* seq_msg = generate_seq_msg(ack_msg);
                     broadcast_final_seq(seq_msg);
@@ -377,11 +372,12 @@ void ISIS::handle_q_change() {
     }
 }
 void ISIS::deliver_msg(CachedMsg *msg) {
+    const auto logger = spdlog::get("console");
+    logger -> info("start delivering msg");
     std::cout << this -> my_id << ": "
     << "Processed message " << msg -> message_id << " from sender "
     << msg -> sender_id << " with seq " << msg -> sequence_num << ", "
     << msg -> proposer << std::endl;
-    free(msg);
     this -> isblocked = false;
 }
 bool ISIS::has_duplication(DataMessage *msg) {
