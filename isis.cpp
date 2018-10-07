@@ -232,6 +232,8 @@ void ISIS::recv_msg() {
         case msg_type::seq:
         {
             SeqMessage* seq_msg = ntoh((SeqMessage *) buffer);
+            logger -> info("received seq msg: id {}, sender: {}, final seq: {}, final proposer: {}",
+                    seq_msg ->msg_id, seq_msg ->sender, seq_msg ->final_seq, seq_msg ->final_seq_proposer);
             this -> curr_seq = std::max(this -> curr_seq, seq_msg -> final_seq);
             CachedMsg* msg_to_be_changed = find_msg(seq_msg -> msg_id, seq_msg -> sender);
             if (msg_to_be_changed == nullptr) {
@@ -241,6 +243,8 @@ void ISIS::recv_msg() {
                 msg_to_be_changed -> proposer = seq_msg -> final_seq_proposer;
                 msg_to_be_changed -> deliverable = true;
 
+                logger -> info("changing element upon final seq, msg is id: {}, seq num: {}, proposer: {}",
+                        msg_to_be_changed ->message_id, msg_to_be_changed ->sequence_num, msg_to_be_changed->proposer);
                 this -> handle_q_change();
             }
             break;
