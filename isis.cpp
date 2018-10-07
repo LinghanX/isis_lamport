@@ -412,6 +412,8 @@ void ISIS::assess_next_state() {
         {
             if (this -> msg_sent == this -> msg_count) {
                 this -> curr_state = state::receiving_msg;
+            } else if (this -> isblocked) {
+                this -> curr_state = state::receiving_msg;
             } else {
                 this -> curr_state = state::sending_data_msg;
                 this -> start_time = std::chrono::steady_clock::now();
