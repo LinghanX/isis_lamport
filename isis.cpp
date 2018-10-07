@@ -307,6 +307,7 @@ SeqMessage* ISIS::generate_seq_msg(AckMessage* ack_msg) {
     for (const auto &n : entry -> second) {
         auto proposer_id = n.first;
         auto proposer_seq = n.second;
+        logger -> critical("proposer_id: {}, proposed seq: {}", proposer_id, proposer_seq);
         // second: proposer, seq
         if (proposer_seq == max_seq && proposer_id < max_proposer) {
             max_seq = proposer_seq;
