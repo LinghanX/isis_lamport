@@ -410,8 +410,7 @@ void ISIS::handle_q_change() {
 void ISIS::deliver_msg(CachedMsg *msg) {
     const auto logger = spdlog::get("console");
     logger -> critical("start delivering msg");
-    std::cout << this -> my_id << ": "
-    << "Processed message " << msg -> message_id << " from sender "
+    std::cout << this -> my_id << ": " << "Processed message " << msg -> message_id << " from sender "
     << msg -> sender_id << " with seq " << msg -> sequence_num << ", "
     << msg -> proposer << std::endl;
     this -> isblocked = false;
