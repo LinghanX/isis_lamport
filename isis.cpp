@@ -446,18 +446,26 @@ void ISIS::assess_next_state() {
         }
         case sending_data_msg:
         {
-            if (this -> isblocked && calc_elapsed_time() > TIME_OUT) {
+            if (this -> isblocked && calc_elapsed_time() < TIME_OUT) {
+                this -> curr_state = state::receiving_msg;
+                this -> start_time = std::chrono::steady_clock::now();
+            } else if (this -> isblocked && calc_elapsed_time() > TIME_OUT) {
                 broadcast_msg_to_timeout_nodes();
+            } else if (!this -> isblocked && this -> counter < this -> msg_count) {
+                this -> curr_state = state::sending_data_msg;
+            } else if (!this -> isblocked && this -> counter >= this -> msg_count) {
+                this -> curr_state = state::receiving_msg;
             }
-            this -> curr_state = state::receiving_msg;
-            this -> start_time = std::chrono::steady_clock::now();
             break;
         }
         case receiving_msg:
         {
             if (this -> counter == this -> msg_count) {
                 this -> curr_state = state::receiving_msg;
+            } else if (this -> isblocked && calc_elapsed_time() < TIME_OUT) {
+                this -> curr_state = state::receiving_msg;
             } else if (this -> isblocked && calc_elapsed_time() > TIME_OUT) {
+                broadcast_msg_to_timeout_nodes();
                 this -> curr_state = state::receiving_msg;
             } else {
                 this -> curr_state = state::sending_data_msg;
