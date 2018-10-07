@@ -279,6 +279,9 @@ CachedMsg* ISIS::find_msg(uint32_t msg_id, uint32_t sender_id) {
 }
 
 void ISIS::broadcast_final_seq(SeqMessage* msg){
+    const auto logger = spdlog::get("console");
+    logger -> info ("broadcasting seq msg, id: {}, sender: {}, final seq: {}, final proposer: {}"
+            , msg ->msg_id, msg ->sender, msg ->final_seq, msg ->final_seq_proposer);
     SeqMessage* seq_msg = hton(msg);
     if (seq_msg != nullptr) {
         for (uint32_t id = 0; id < this -> num_of_nodes; id ++) {
