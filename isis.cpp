@@ -293,16 +293,16 @@ void ISIS::broadcast_final_seq(SeqMessage* msg){
 }
 SeqMessage* ISIS::generate_seq_msg(AckMessage* ack_msg) {
     const auto logger = spdlog::get("console");
-    for (const auto &n : this -> proposals) {
-        logger -> critical("message id {}", n.first);
-        for (const auto &m : n.second) {
-            logger -> critical("proposer is: {}, proposed seq: {}", m.first, m.second);
-        }
-    }
+//    for (const auto &n : this -> proposals) {
+//        logger -> critical("message id {}", n.first);
+//        for (const auto &m : n.second) {
+//            logger -> critical("proposer is: {}, proposed seq: {}", m.first, m.second);
+//        }
+//    }
     auto msg_id = ack_msg -> msg_id;
     auto entry = this -> proposals.find(msg_id);
-    auto max_seq = static_cast<uint32_t>(-1);
-    auto max_proposer = static_cast<uint32_t>(-1);
+    int max_seq = -1;
+    int max_proposer = -1;
 
     for (const auto &n : entry -> second) {
         auto proposer_id = n.first;
