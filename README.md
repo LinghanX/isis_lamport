@@ -1,12 +1,15 @@
-# Tasks at hand:
+# Usage:
+To run the program, please change directory
+to `./debug`, where all the make files are
+located
+`$ cd debug`
 
-* Need a script file to dictate starting/sending/error
-detection etc.
+Then `$ make`
 
-* Multibroadcast 
-
-* Error detection on receiving messages from `main()`
-
+After the objects are compiled, run 
+`$ prj1_tm -p port -h hostfile -c count`
+Note that port number should be of range
+10000 to 65000
 
 references:
 
