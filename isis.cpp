@@ -475,6 +475,8 @@ msg_type ISIS::check_msg_type(void *msg, ssize_t size) {
         return msg_type::ack;
     } else if (size == sizeof(SeqMessage) && *first_int == 3) {
         return msg_type::seq;
+    } else if (size == sizeof(MkMessage) && *first_int == 4) {
+        return msg_type::mk;
     } else {
         logger -> error("unable to identify incoming message");
         return msg_type::unknown;
@@ -501,6 +503,7 @@ void ISIS::broadcast_marker() {
     for (uint32_t id = 0; id < this -> num_of_nodes; id++) {
         send_msg(msg, addr_book[id], sizeof(MkMessage));
     }
+    this -> counter = -1;
     delete(msg);
 }
 void ISIS::assess_next_state() {
