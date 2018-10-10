@@ -42,7 +42,6 @@ void ISIS::init() {
     freeaddrinfo(res);
     this -> listening_fd = fd;
 
-    logger -> info("start listening on port: {}, with fd: {}", port, fd);
 }
 ISIS::~ISIS() {
     close(this-> listening_fd);
@@ -109,7 +108,6 @@ void ISIS::broadcast_data_msg() {
     DataMessage *msg = generate_data_msg();
     if (msg == nullptr)
         logger -> error("unable to allocate data message");
-    logger -> info("start broadcasting msg sender: {}, id: {}, type: {}", msg ->sender, msg ->msg_id, msg->type);
     int num_of_msg_send = 0;
     std::vector<bool> has_sent_msg(static_cast<unsigned long>(this -> num_of_nodes), false);
 
@@ -127,18 +125,15 @@ void ISIS::broadcast_data_msg() {
             if (sent) {
                 num_of_msg_send++;
                 has_sent_msg[id] = true;
-                logger -> info("message has been sent to {}", this -> addr_book[id]);
             }
         }
     }
     delete(msg);
 
-    logger -> info("all data message successfully sent");
     this -> isblocked = true; // blocked waiting for ackowledgement
 }
 bool ISIS::send_msg(void *msg, std::string addr, uint32_t size) {
     const auto logger = spdlog::get("console");
-    logger -> info("start sending message to addr {}", addr);
 
     int sock_fd, status, num_bytes;
     struct addrinfo hint, *res, *res0;
@@ -172,7 +167,6 @@ bool ISIS::send_msg(void *msg, std::string addr, uint32_t size) {
         logger -> error("unable to send msg");
         return false;
     }
-    logger -> info("message successfully sent");
 
     close(sock_fd);
     freeaddrinfo(res);
@@ -181,7 +175,6 @@ bool ISIS::send_msg(void *msg, std::string addr, uint32_t size) {
 }
 void ISIS::recv_msg() {
     const auto logger = spdlog::get("console");
-//    logger -> info("start receiving message");
     char buffer[BUFFER_SIZE];
     ssize_t num_bytes;
     struct sockaddr_in neighbor;
@@ -195,7 +188,6 @@ void ISIS::recv_msg() {
             (struct sockaddr *) &neighbor,
             &addr_len)) < 0 )
     {
-//        logger -> error("unable to receive message");
     }
     if (num_bytes <= 0) return;
 
@@ -209,8 +201,6 @@ void ISIS::recv_msg() {
         case msg_type::data:
         {
             DataMessage* msg = ntoh((DataMessage *) buffer);
-            logger -> info("received data message id: {}, sender: {}",
-                           msg ->msg_id, msg ->sender);
             if(!has_duplication(msg)) {
                 this -> curr_seq += 1;
                 send_ack_msg(msg);
@@ -222,24 +212,13 @@ void ISIS::recv_msg() {
         {
             AckMessage* ack_msg = ntoh((AckMessage *) buffer);
 
-            logger -> info("received acknowledgement id: {}, sender: {}, propser: {}, proposed seq: {}",
-                    ack_msg ->msg_id,
-                    ack_msg ->sender,
-                    ack_msg ->proposer,
-                    ack_msg ->proposed_seq);
             if (ack_has_received(ack_msg)) {
                 logger -> info("the ackowledgement has been received before");
             } else {
-//                if (this -> proposals.count(ack_msg -> msg_id) == 0) {
-//                    std::unordered_map<uint32_t, uint32_t> entry = {{ack_msg -> proposer, ack_msg -> proposed_seq}};
-//                    this -> proposals[ack_msg -> msg_id] = entry;
-//                } else {
                 this -> proposals[ack_msg -> msg_id][ack_msg -> proposer] = ack_msg -> proposed_seq;
-//                }
                 if (this -> proposals.find(ack_msg -> msg_id) -> second.size() == this -> num_of_nodes - 1) {
                     SeqMessage* seq_msg = generate_seq_msg(ack_msg);
                     broadcast_final_seq(seq_msg);
-                    logger -> info("all ack has been received, final seq sent");
                 }
             }
             break;
@@ -277,8 +256,6 @@ void ISIS::make_local_snapshot() {
 }
 void ISIS::handle_seq_msg(SeqMessage* seq_msg) {
     const auto logger = spdlog::get("console");
-    logger -> info("received seq msg: id {}, sender: {}, final seq: {}, final proposer: {}",
-                   seq_msg ->msg_id, seq_msg ->sender, seq_msg ->final_seq, seq_msg ->final_seq_proposer);
     this -> curr_seq = std::max(this -> curr_seq, seq_msg -> final_seq);
     CachedMsg* msg_to_be_changed = find_msg(seq_msg -> msg_id, seq_msg -> sender);
     if (msg_to_be_changed == nullptr) {
@@ -288,8 +265,6 @@ void ISIS::handle_seq_msg(SeqMessage* seq_msg) {
         msg_to_be_changed -> proposer = seq_msg -> final_seq_proposer;
         msg_to_be_changed -> deliverable = true;
 
-        logger -> info("changing element upon final seq, msg is id: {}, seq num: {}, proposer: {}",
-                       msg_to_be_changed ->message_id, msg_to_be_changed ->sequence_num, msg_to_be_changed->proposer);
         this -> handle_q_change();
     }
 }
@@ -319,15 +294,9 @@ CachedMsg* ISIS::find_msg(uint32_t msg_id, uint32_t sender_id) {
 
 void ISIS::broadcast_final_seq(SeqMessage* msg){
     const auto logger = spdlog::get("console");
-    logger -> info ("broadcasting seq msg, id: {}, sender: {}, final seq: {}, final proposer: {}"
-            , msg ->msg_id, msg ->sender, msg ->final_seq, msg ->final_seq_proposer);
     char buffer[sizeof(SeqMessage)];
     memcpy(buffer, msg, sizeof(SeqMessage));
 
-//    std::cout << this -> my_id << ": "
-//              << "Processed message " << msg -> msg_id << " from sender "
-//              << msg -> sender << " with seq " << msg -> final_seq << ", "
-//              << msg -> final_seq_proposer << std::endl;
     handle_seq_msg((SeqMessage *)buffer);
 
     this -> isblocked = false;
@@ -388,8 +357,6 @@ void ISIS::send_ack_msg(DataMessage *msg) {
     const auto &logger = spdlog::get("console");
     AckMessage * ack = generate_ack_msg(msg);
 
-    logger -> info("sending ack msg id: {}, sender: {}, proposed seq: {}, proposer: {}",
-            ack ->msg_id, ack ->sender, ack->proposed_seq, ack->proposer);
     hton(ack);
 
     if (ack != nullptr) {
@@ -408,9 +375,6 @@ void ISIS::enque_msg(DataMessage *msg) {
     cache_msg -> deliverable = false;
 
     this -> msg_q.push_back(*cache_msg);
-    logger -> info("pushed message into the q: data: {}, id: {}, sender: {}, seq_num: {}, proposer: {}, deliverable: {} ",
-            cache_msg -> data, cache_msg -> message_id, cache_msg -> sender_id, cache_msg -> sequence_num,
-            cache_msg -> proposer, cache_msg -> deliverable);
     this -> handle_q_change();
 }
 void ISIS::handle_q_change() {
@@ -522,7 +486,6 @@ void ISIS::assess_next_state() {
             } else {
                 this -> curr_state = state::sending_data_msg;
                 this -> start_time = std::chrono::steady_clock::now();
-                logger -> info("transition to state {}", this -> curr_state);
             }
             break;
         }
@@ -554,7 +517,6 @@ void ISIS::assess_next_state() {
                 this -> curr_state = state::receiving_msg;
             } else {
                 this -> curr_state = state::sending_data_msg;
-                logger -> info("transition to state {}", this -> curr_state);
             }
 
             break;
@@ -569,7 +531,6 @@ void ISIS::broadcast_msg_to_timeout_nodes() {
     DataMessage * msg = generate_data_msg();
     if (msg == nullptr) return;
 
-    logger -> info("resending msg, id: {}, sender: {}, type: {}", msg ->msg_id, msg ->sender, msg ->type);
     hton(msg);
     for (uint32_t id = 0; id < this -> num_of_nodes; id++) {
         if (id != this -> my_id || this -> proposals.find(msg->msg_id) -> second.count(id) == 0)
