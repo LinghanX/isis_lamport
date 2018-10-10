@@ -539,7 +539,10 @@ void ISIS::assess_next_state() {
         }
         case receiving_msg:
         {
-            if (this -> counter == this -> msg_count) {
+            if (this -> counter == this -> marker) {
+                broadcast_marker();
+                assess_next_state();
+            } else if (this -> counter == this -> msg_count) {
                 this -> curr_state = state::receiving_msg;
             } else if (this -> isblocked && calc_elapsed_time() < TIME_OUT) {
                 this -> curr_state = state::receiving_msg;
