@@ -22,9 +22,10 @@ int main (int argc, char **argv) {
     std::vector<std::string> addr_book;
     std::string port;
     int count;
+    int marker;
 
-    std::tie(addr_book, port, count) = handle_input(argc, argv);
-    ISIS *program = new ISIS(addr_book, port, count);
+    std::tie(addr_book, port, count, marker) = handle_input(argc, argv);
+    ISIS *program = new ISIS(addr_book, port, count, marker);
     program->run_isis();
 
     exit(0);

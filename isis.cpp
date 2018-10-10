@@ -49,7 +49,7 @@ ISIS::~ISIS() {
 }
 ISIS::ISIS( std::vector<std::string> &addr_book,
             std::string port,
-            int msg_num)
+            int msg_num, int marker)
 {
     auto logger = spdlog::get("console");
     char currHostName[MAX_HOSTNAME_LEN]; // my name
@@ -77,6 +77,7 @@ ISIS::ISIS( std::vector<std::string> &addr_book,
 
     this -> curr_seq = 0;
     this -> counter = 0;
+    this -> marker = marker;
     init();
     logger -> info("initiating ISIS with curr_state: {}", this -> curr_state);
     logger -> info("initiating ISIS with msg count: {}", this -> msg_count);
@@ -93,6 +94,13 @@ DataMessage* ISIS::generate_data_msg() {
     msg -> sender = this -> my_id;
     msg -> data = DUMMY_DATA;
     msg -> msg_id = static_cast<uint32_t>(this -> counter); // the msg_id is always num of msg sent
+
+    return msg;
+}
+MkMessage* ISIS::generate_marker_msg() {
+    auto *msg = new MkMessage;
+    msg -> type = 4;
+    msg -> sender = this -> my_id;
 
     return msg;
 }
@@ -193,6 +201,11 @@ void ISIS::recv_msg() {
 
     msg_type type = check_msg_type(buffer, num_bytes);
     switch (type) {
+        case msg_type::mk:
+        {
+            make_local_snapshot();
+            this -> recording = true;
+        }
         case msg_type::data:
         {
             DataMessage* msg = ntoh((DataMessage *) buffer);
@@ -241,6 +254,26 @@ void ISIS::recv_msg() {
             logger -> error("unknow type message");
             break;
     }
+}
+void ISIS::make_local_snapshot() {
+    std::ofstream file ("snapshot.txt");
+    file << "List of messages that have been ordered/processed: " << std::endl;
+
+    for (const auto &n : this -> msg_delivered) {
+        file << "message id:" << n.message_id
+             << " seq num" << n.sequence_num <<std::endl;
+    }
+
+    file << "List of messages thats in hold back queue: " << std::endl;
+
+    for (const auto &n : this->msg_q) {
+        file << "message id: " << n.message_id << "sequence num" << n.sequence_num
+            << "is deliverable: " << n.deliverable << std::endl;
+    }
+
+    file << "Last message sequence num: " << this -> counter << std::endl;
+
+    file.close();
 }
 void ISIS::handle_seq_msg(SeqMessage* seq_msg) {
     const auto logger = spdlog::get("console");
@@ -403,6 +436,7 @@ void ISIS::handle_q_change() {
 
     while (!this -> msg_q.empty() && this -> msg_q.front().deliverable) {
         CachedMsg first_msg = msg_q.front();
+        msg_delivered.push_back(first_msg);
         deliver_msg(&first_msg);
         this -> msg_q.erase(this -> msg_q.begin());
     }
@@ -458,13 +492,27 @@ void ISIS::establish_connection() {
         }
     }
 }
+void ISIS::broadcast_marker() {
+    const auto logger = spdlog::get("console");
+    MkMessage * msg = generate_marker_msg();
+    if (msg == nullptr) return;
+
+    hton(msg);
+    for (uint32_t id = 0; id < this -> num_of_nodes; id++) {
+        send_msg(msg, addr_book[id], sizeof(MkMessage));
+    }
+    delete(msg);
+}
 void ISIS::assess_next_state() {
     const auto logger = spdlog::get("console");
 
     switch (this -> curr_state) {
         case establishing_connection:
         {
-            if (this -> counter == this -> msg_count) {
+            if (this -> counter == this -> marker) {
+                broadcast_marker();
+                assess_next_state();
+            } else if (this -> counter == this -> msg_count) {
                 this -> curr_state = state::receiving_msg;
             } else if (this -> isblocked) {
                 this -> curr_state = state::receiving_msg;

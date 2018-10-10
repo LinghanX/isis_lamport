@@ -9,5 +9,5 @@
 using namespace std;
 
 vector<string> parsePath(string paths);
-tuple<vector<string>, string, int> handle_input(int argc, char **argv);
+tuple<vector<string>, string, int, int> handle_input(int argc, char **argv);
 #endif //ISIS_LAMPORT_PARSE_H

@@ -32,7 +32,7 @@ std::vector<std::string> parsePath(std::string paths) {
     return addr_book;
 }
 
-std::tuple<std::vector<std::string>, std::string, int> handle_input(int argc, char **argv)
+std::tuple<std::vector<std::string>, std::string, int, int> handle_input(int argc, char **argv)
 {
     auto logger = spdlog::get("console");
 
@@ -43,9 +43,10 @@ std::tuple<std::vector<std::string>, std::string, int> handle_input(int argc, ch
     std::string portNum;
     char *path;
     int count = 0;
+    int marker = 0;
     std::vector<std::string> neighbors;
 
-    while ((option = getopt(argc, argv, "p:h:c:")) != -1) {
+    while ((option = getopt(argc, argv, "p:h:c:s:")) != -1) {
         switch (option) {
             case 'p':
                 portNum = optarg;
@@ -59,6 +60,9 @@ std::tuple<std::vector<std::string>, std::string, int> handle_input(int argc, ch
             case 'c':
                 count = atoi(optarg);
                 cflag = 1;
+                break;
+            case 's':
+                marker = atoi(optarg);
                 break;
             case '?':
                 if (optopt == 'p')
@@ -86,5 +90,5 @@ std::tuple<std::vector<std::string>, std::string, int> handle_input(int argc, ch
     logger -> info("the selected count is: {}", count);
     logger -> info("the selected file path is: {}", path);
 
-    return std::make_tuple(neighbors, portNum, count);
+    return std::make_tuple(neighbors, portNum, count, marker);
 }

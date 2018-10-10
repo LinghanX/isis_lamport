@@ -3,6 +3,16 @@
 //
 #include "messages.h"
 
+MkMessage* hton(MkMessage* msg) {
+    msg -> type = htonl(msg -> type);
+    msg -> sender = htonl(msg -> sender);
+    return msg;
+}
+MkMessage* ntoh(MkMessage* msg) {
+    msg -> sender = ntohl(msg -> sender);
+
+    return msg;
+}
 DataMessage* hton(DataMessage* msg) {
     msg -> type = htonl(msg->type);
     msg -> sender = htonl(msg -> sender);

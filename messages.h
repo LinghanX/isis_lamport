@@ -33,6 +33,13 @@ typedef struct {
     uint32_t final_seq_proposer;
 } SeqMessage;
 
+typedef struct {
+    uint32_t type; // must be 4
+    uint32_t sender; // the initiator of marker
+} MkMessage;
+
+MkMessage* hton(MkMessage* msg);
+MkMessage* ntoh(MkMessage* msg);
 DataMessage* hton(DataMessage* msg);
 DataMessage* ntoh(DataMessage* msg);
 AckMessage* hton(AckMessage* msg);

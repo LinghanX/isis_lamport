@@ -6,6 +6,7 @@
 #define ISIS_LAMPORT_ISIS_H
 
 #include <stdlib.h>
+#include <fstream>
 #include <string.h>
 #include <unordered_map>
 #include <vector>
@@ -48,6 +49,7 @@ enum msg_type {
     data,
     ack,
     seq,
+    mk,
     unknown
 };
 
@@ -57,10 +59,12 @@ protected:
     uint32_t msg_count; // number of message that needs to be delivered
     uint32_t counter; // number of message that has been sent
     uint32_t curr_seq; // sequence number
+    int marker;
     int listening_fd; // file descriptor
     state curr_state; // an enum to keep track of current state
     // a flag to indicate if its allowed to send msg;
     bool isblocked;
+    bool recording;
     // to keep track of elapsed time
     std::chrono::steady_clock::time_point start_time;
     std::chrono::steady_clock::time_point end_time;
@@ -72,9 +76,13 @@ protected:
     // a msg_q is a queue of CachedMsg
     std::vector<CachedMsg> msg_q;
     std::vector<std::string> addr_book;
+    std::vector<CachedMsg> msg_delivered;
 
     long long int calc_elapsed_time();
     void broadcast_msg_to_timeout_nodes();
+    void broadcast_marker();
+    void make_local_snapshot();
+    MkMessage* generate_marker_msg();
     void init();
     void broadcast_data_msg();
     void recv_msg();
@@ -99,7 +107,7 @@ protected:
     bool ack_has_received(AckMessage* msg);
 
 public:
-    ISIS(std::vector<std::string> &, std::string, int);
+    ISIS(std::vector<std::string> &, std::string, int, int);
     ~ISIS();
     void run_isis();
 };
